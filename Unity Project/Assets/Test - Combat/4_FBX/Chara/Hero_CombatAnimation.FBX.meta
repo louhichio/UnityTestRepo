@@ -443,16 +443,17 @@ ModelImporter:
     7400050: Atk_Mid_02a
     7400052: Atk_Mid_03a
     9500000: //RootNode
-    13700000: Hero_Bow_MDL
-    13700002: Hero_Gloves_MDL
-    13700004: Hero_Hair_MDL
-    13700006: Hero_Head_MDL
-    13700008: Hero_LowerBody_MDL
-    13700010: Hero_Quiver_MDL
-    13700012: Hero_Sheath_MDL
-    13700014: Hero_UpperBody_MDL
-    13700016: Hero_Cloak_MDL
-    13700018: Hero_Grapple_MDL
+    11100000: Hero_Bow_MDL
+    13700000: Hero_Gloves_MDL
+    13700002: Hero_Hair_MDL
+    13700004: Hero_Head_MDL
+    13700006: Hero_LowerBody_MDL
+    13700008: Hero_Quiver_MDL
+    13700010: Hero_Sheath_MDL
+    13700012: Hero_UpperBody_MDL
+    13700014: Hero_Cloak_MDL
+    13700016: Hero_Grapple_MDL
+    13700018: Hero_Bow_MDL
   materials:
     importMaterials: 1
     materialName: 0
@@ -9459,7 +9460,7 @@ ModelImporter:
       cycleOffset: 0
       loop: 0
       hasAdditiveReferencePose: 0
-      loopTime: 0
+      loopTime: 1
       loopBlend: 0
       loopBlendOrientation: 1
       loopBlendPositionY: 1
@@ -12493,7 +12494,7 @@ ModelImporter:
     useFileScale: 1
   tangentSpace:
     normalSmoothAngle: 60
-    normalImportMode: 0
+    normalImportMode: 1
     tangentImportMode: 3
   importAnimation: 1
   copyAvatar: 0

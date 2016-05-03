@@ -4,6 +4,7 @@ using System.Collections;
 public class InputManager : Singleton<InputManager> 
 {
 	#region Properties
+	[Tooltip("Pourcentage de la largeur de l'ecran a parcourir avec le doigt")]
 	[SerializeField]
 	private float minSwipeInputLength = 10;
 	private float maxTapTimer = 0.5f;
@@ -51,6 +52,7 @@ public class InputManager : Singleton<InputManager>
 			if (dist >= minSwipeInputLength * screenWidth) 
 			{
 				UIManager.Instance.ShowText ("Swipe Detected");
+				PlayerManager.Instance.SwipeDetected ();
 			} 
 			else 
 			{
@@ -61,10 +63,12 @@ public class InputManager : Singleton<InputManager>
 					if (Input.mousePosition.x < Screen.width / 2) 
 					{
 						UIManager.Instance.ShowText ("Left Tap");
+						PlayerManager.Instance.LeftTapDetected ();
 					} 
 					else if (Input.mousePosition.x > Screen.width / 2) 
 					{
 						UIManager.Instance.ShowText ("Right Tap");
+						PlayerManager.Instance.RightTapDetected ();
 					}
 				}
 			}
@@ -110,6 +114,7 @@ public class InputManager : Singleton<InputManager>
 							else if (touch.position.x > Screen.width / 2) 
 							{
 								UIManager.Instance.ShowText ("Right Tap");
+								PlayerManager.Instance.RightTapDetected ();
 							}
 						}
 					}
