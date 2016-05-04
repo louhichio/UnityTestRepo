@@ -9,6 +9,19 @@ public class EnemyManager : Singleton<EnemyManager>
 
 	private List<Enemy> enemyList = new List<Enemy>();
 	private Enemy currentTargetedEnemy;
+
+	private float attTimer = 0;
+	private float attWaitTime = 2.0f;
+
+	private bool isEnemyAttacking;
+	private Enemy lastAttackingEnemy; 
+
+	[SerializeField]
+	private Transform placementPoints;
+	[SerializeField]
+	List<Transform> linkedPlacementPoints = new List<Transform>();
+	[SerializeField]
+	List<Transform> unlinkedPlacementPoints = new List<Transform>();
 	#endregion
 
 	#region Unity
@@ -20,23 +33,13 @@ public class EnemyManager : Singleton<EnemyManager>
 	void Start()
 	{
 		marker.gameObject.SetActive (false);
+		GeneratePositionList ();
 	}
 
 	void Update () 
-	{	
-		if (!Enemy.ReferenceEquals (currentTargetedEnemy, null)) 
-		{
-			marker.gameObject.SetActive (true);
-
-			Vector3 pos = currentTargetedEnemy.transform.position;
-			pos.y = 1.8f;
-			marker.position = pos;
-
-			marker.LookAt (Camera.main.transform.position);
-		}
-		else
-			marker.gameObject.SetActive (false);
-			
+	{
+		UpdateMarkerPosition ();
+		AttackManager ();
 	}
 	#endregion
 
@@ -51,21 +54,108 @@ public class EnemyManager : Singleton<EnemyManager>
 				marker = child;
 		}
 	}
-	#endregion
 
-	#region Public
-	public Enemy GetNewTarget(Enemy currentTarget, float coneLength, float coneAngle)
+	private void UpdateMarkerPosition()
 	{
-		List<Enemy> temp = new List<Enemy>();
+		if (!Enemy.ReferenceEquals (currentTargetedEnemy, null)) 
+		{
+			marker.gameObject.SetActive (true);
 
+			Vector3 pos = currentTargetedEnemy.transform.position;
+			pos.y = 1.8f;
+			marker.position = pos;
+
+			marker.LookAt (Camera.main.transform.position);
+		}
+		else
+			marker.gameObject.SetActive (false);
+	}
+
+	private List<Enemy> GetEnemiesInCone()
+	{
+		float coneLength = PlayerManager.Instance.GetConeLength ();
+		float coneAngle = PlayerManager.Instance.GetConeAngle ();
+
+		List<Enemy> temp = new List<Enemy>();
 		foreach (var enemy in enemyList) 
 		{			
-			if (enemy.GetDistance() < coneLength) 
+			if (enemy.CanBeAttacked() && enemy.GetDistance() < coneLength) 
 			{
 				if (enemy.GetAngle() <= coneAngle && enemy.GetAngle() >= -coneAngle) 
 					temp.Add (enemy);
 			}
 		}
+		return temp;
+	}
+
+	private void AttackManager()
+	{
+		if(!isEnemyAttacking && Time.time > attTimer && !PlayerManager.Instance.IsDead())
+		{
+//			List<Enemy> enemiesInCone = GetEnemiesInCone ();
+			List<Enemy> enemiesInCone = enemyList.FindAll (x => x.CanAttack() && x.IsInCameraFOV());
+
+			if (!List<Enemy>.ReferenceEquals (enemiesInCone, null)) 
+			{
+				if (enemiesInCone.Count > 1) 
+				{
+					lastAttackingEnemy = enemiesInCone.Find (x => x != lastAttackingEnemy);
+					lastAttackingEnemy.AllowedToAttack ();
+					isEnemyAttacking = true;
+
+				} 
+				else if (enemiesInCone.Count == 1) 
+				{
+					lastAttackingEnemy = enemiesInCone [0];
+					lastAttackingEnemy.AllowedToAttack ();
+					isEnemyAttacking = true;
+				}
+			}
+		}
+  	}
+
+	//Sets a placement position to closest Enemy
+	private void GeneratePositionList()
+	{
+		if (placementPoints != null) 
+		{
+			float dist;
+			Enemy temp;
+
+			foreach (Transform point in placementPoints) 
+			{
+				dist = Mathf.Infinity;
+				temp = null;
+
+				foreach (var enemy in enemyList) 
+				{
+					float currentDist = Vector3.Distance (enemy.transform.position, point.position);
+
+//					print (currentDist + "   " + dist + "  " + enemy.Linked ());
+					if (currentDist < dist && !enemy.Linked ()) 
+					{
+						temp = enemy;
+					}
+				}
+
+				if (!Enemy.ReferenceEquals (temp, null)) 
+				{
+					temp.SetPlacementPoint (point);
+					linkedPlacementPoints.Add (point);
+				} else
+					unlinkedPlacementPoints.Add (point);
+			}
+
+
+		}
+		else print("Placement Points Gameobject isn't linked to EnemyManager");
+  	}
+	#endregion
+
+	#region Public
+	public Enemy GetNewTarget(Enemy currentTarget, float coneLength, float coneAngle)
+	{
+		List<Enemy> temp = GetEnemiesInCone ();
 
 		if (!List<Enemy>.ReferenceEquals (null, temp) && temp.Count > 1) 
 		{
@@ -83,7 +173,8 @@ public class EnemyManager : Singleton<EnemyManager>
 		} 
 		else 
 		{
-			temp = enemyList;
+			temp = enemyList.FindAll(x => x.CanBeAttacked());
+
 			temp.Sort (delegate(Enemy a, Enemy b) 
 				{
 //					int compareThreat = a.GetThreat().CompareTo (b.GetThreat());
@@ -96,13 +187,12 @@ public class EnemyManager : Singleton<EnemyManager>
 			currentTargetedEnemy = temp.Find (x => x != currentTarget);
 			return currentTargetedEnemy;
 		}
-
-		return null;
+//		return null;
 	}
 
 	public Enemy GetClosestEnemy()
 	{
-		Enemy closestEnemy = null;
+		currentTargetedEnemy = null;
 		Vector3 pl = PlayerManager.Instance.transform.position;
 
 		float dist = Mathf.Infinity;
@@ -112,13 +202,27 @@ public class EnemyManager : Singleton<EnemyManager>
 		{
 			distTemp = Vector3.Distance (pl, enemy.transform.position);
 
-			if (distTemp < dist) 
+			if (enemy.CanBeAttacked() && distTemp < dist) 
 			{
-				closestEnemy = enemy;
+				currentTargetedEnemy = enemy;
 				dist = distTemp;
 			}
 		}
-		return closestEnemy;
+		return currentTargetedEnemy;
+	}
+
+	public void CheckAnyEnemyLeft()
+	{
+		if (Enemy.ReferenceEquals (enemyList.Find (x => x.isAlive()), null)) 
+		{
+//			GameOver
+		}
+	}
+
+	public void EnemyFinishedAttack()
+	{
+		attTimer = Time.time + attWaitTime;
+		isEnemyAttacking = false;
 	}
 	#endregion
 }

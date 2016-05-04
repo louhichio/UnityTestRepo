@@ -5,6 +5,17 @@ using System.Collections.Generic;
 public class PlayerManager : Singleton<PlayerManager> 
 {
 	#region Properties
+	private enum State
+	{
+		None,
+		Idle,
+		Attack,
+		Move,
+		Dodge,
+		Hit,
+		Dead
+	}
+
 	[Header("Playable character Movements")]
 	[SerializeField]
 	private int health = 150;
@@ -26,36 +37,33 @@ public class PlayerManager : Singleton<PlayerManager>
 	private int comboMeter = 0;
 	private float comboResetTimer = Mathf.Infinity;
 
-	private bool isHit = false;
 	private bool isAttacked = false;
 
 	private Enemy target;
 	private Animator anim;
 	private NavMeshAgent agent;
-
-	private enum State
-	{
-		Idle,
-		Attack,
-		GetClose,
-		Dodge,
-		Hit
-	}
-
 	private State currentState;
+
 	private bool isBufferOpen = false;
 	private bool isChainAttack = false;
 
-	private AnimAction melee;
-//	private AnimAction mid;
-	private AnimAction range;
-//	private AnimAction dash;
+	private bool isIdle = true;
+	private bool isMove = false;
+	private bool isAttack = false;
+	private bool isDodge = false;
+	private bool isDead = false;
+	private bool isHit = false;
 
 	private float distToReach = 0;
+
+	private AnimAction melee;
+	private AnimAction range;
+	//	private AnimAction dash;
+	//	private AnimAction mid;
 	#endregion
 
 	#region Unity
-	void OnDrawGizmosSelected()
+	void OnDrawGizmosSetected()
 	{
 		Gizmos.color = Color.black;
 		Gizmos.DrawLine (transform.position, transform.forward * coneLength);
@@ -66,6 +74,11 @@ public class PlayerManager : Singleton<PlayerManager>
 		Gizmos.DrawLine (transform.position, pos * coneLength);
 		pos = Quaternion.AngleAxis (-coneAngle, Vector3.up) * transform.forward;
 		Gizmos.DrawLine (transform.position, pos * coneLength);
+
+//		Gizmos.color = Color.red;
+//		Gizmos.DrawSphere (transform.position, 2.12f);
+//		Gizmos.color = Color.yellow;
+//		Gizmos.DrawSphere (transform.position, 6f);
 	}
 
 	void Awake()
@@ -78,16 +91,130 @@ public class PlayerManager : Singleton<PlayerManager>
 
 	void Start()
 	{
-		currentState = State.Idle;
+		SwitchState (State.Idle);
 	}
 
 	void Update()
 	{
-		StateMachine ();
+		CheckState ();
+		UpdateState ();
 
 		if (Time.time >= comboResetTimer) 
 		{
 			ResetCombo ();
+		}
+	}
+	#endregion
+
+	#region StateMachine
+	private void CheckState()
+	{		
+		if(isDead)
+		{
+			isDead = false;
+			SwitchState (State.Dead);
+		}
+		else if(isDodge) 
+		{
+			isDodge = false;
+			SwitchState (State.Dodge);
+		}
+		else if (isHit) 
+		{
+			isHit = false;
+			SwitchState (State.Hit);
+		}
+		else if (isMove) 
+		{
+			isMove = false;
+			SwitchState (State.Move);
+		} 
+		else if (isAttack) 
+		{
+			isAttack = false;
+			SwitchState (State.Attack);
+		}
+		else if(isIdle)
+		{
+			isIdle = false;
+			SwitchState (State.Idle);
+		}
+	}
+
+	private void UpdateState()
+	{
+		switch (currentState)
+		{
+		case State.Attack:
+			if (!Enemy.ReferenceEquals (target, null)) 
+			{
+				LookAtTarget ();
+				anim.SetFloat ("Distance", Vector3.Distance (transform.position, target.transform.position));
+			}
+			break;
+		case State.Move:
+			//			LookAtTarget ();
+			anim.SetFloat ("Distance", Vector3.Distance (transform.position, target.transform.position));
+			CloseDistance ();
+			break;
+		case State.Hit:
+			ResetCombo ();
+			break;
+		case State.Dodge:
+			break;
+		}
+	}
+
+	private void SwitchState(State newState)
+	{
+		if ((currentState != newState || newState == State.Hit) && currentState != State.Dead) 
+		{
+			// end old state
+			switch (currentState)
+			{
+			case State.Idle:
+				break;
+			case State.Attack:
+				break;
+			case State.Move:	
+				agent.velocity = Vector3.zero;
+				agent.Stop ();
+				break;
+			case State.Dodge:
+				break;
+			case State.Hit:
+				break;
+			case State.Dead:
+				break;
+			}
+
+			currentState = newState;
+
+			// start newState
+			switch (currentState)
+			{
+			case State.Idle:
+				break;
+			case State.Attack:
+				anim.SetFloat ("Distance", Vector3.Distance (transform.position, target.transform.position));
+				anim.SetTrigger ("Attack");
+				break;
+			case State.Move:
+				anim.SetTrigger ("Dash");
+				distToReach = melee.maxRange;
+				break;
+			case State.Dodge:
+				anim.SetTrigger ("Dodge");
+				isAttacked = false;
+				break;
+			case State.Hit:
+				anim.SetTrigger ("Hit");
+				CheckHealth ();
+				break;
+			case State.Dead:
+				anim.SetTrigger ("Dead");
+				break;
+			}
 		}
 	}
 	#endregion
@@ -117,31 +244,9 @@ public class PlayerManager : Singleton<PlayerManager>
 		//		dash = new AnimAction (actionAnimList);
 	}
 
-	private void StateMachine()
-	{
-		switch (currentState)
-		{
-		case State.Attack:
-			LookAtTarget ();
-			anim.SetFloat ("Distance", Vector3.Distance (transform.position, target.transform.position));
-			break;
-		case State.GetClose:
-//			LookAtTarget ();
-			anim.SetFloat ("Distance", Vector3.Distance (transform.position, target.transform.position));
-			CloseDistance ();
-			break;
-		case State.Hit:
-			ResetCombo ();
-			break;
-		case State.Dodge:
-			break;
-		}
-	}
-
 	private void ResetCombo()
 	{
 		comboMeter = 0;
-		isHit = false;
 		comboResetTimer = Mathf.Infinity;
   	}
 
@@ -150,12 +255,8 @@ public class PlayerManager : Singleton<PlayerManager>
 		comboResetTimer = Mathf.Infinity;
 		float dist = Vector3.Distance (transform.position, target.transform.position);
 
-//		print (dist + "  " + distToReach + "  " + target);
-
 		if (dist > distToReach) 
 		{
-//			transform.position += transform.forward.normalized * (Time.deltaTime);
-
 			agent.destination = target.transform.position;
 			agent.velocity = agent.desiredVelocity * agent.speed;
 			agent.Resume ();
@@ -183,66 +284,41 @@ public class PlayerManager : Singleton<PlayerManager>
 		if (!Enemy.ReferenceEquals (target, null)) 
 		{
 			if (Vector3.Distance (transform.position, target.transform.position) > melee.maxRange) 
-			{
-				distToReach = melee.maxRange;
-				currentState = State.GetClose;
-				anim.SetTrigger ("Dash");
-			} 
+				isMove = true;
 			else
-			{
 				BasicAttack ();
-			}
 		}
 	}
 
 	private void BasicAttack()
 	{
-		if (Enemy.ReferenceEquals (target, null)) 
+		if (Enemy.ReferenceEquals (target, null) || !target.CanBeAttacked()) 
 		{
 			target = EnemyManager.Instance.GetClosestEnemy ();
 		}
 
-		if (Vector3.Distance (transform.position, target.transform.position) > range.maxRange) 
+		if (!Enemy.ReferenceEquals (target, null)) 
 		{
-			distToReach = range.maxRange;
-			if (currentState == State.GetClose)
-				print ("here");
-			currentState = State.GetClose;
-			anim.SetTrigger ("Dash");
-		} 
-		else 
-		{
-			currentState = State.Attack;
-			anim.SetFloat ("Distance", Vector3.Distance (transform.position, target.transform.position));
-			anim.SetTrigger ("Attack");
+			if (Vector3.Distance (transform.position, target.transform.position) > range.maxRange) 
+				isMove = true;
+			else 
+				isAttack = true;
 		}
 	}
 
 	private void CheckHealth()
 	{
 		if (health <= 0) 
-		{
-//			GameOver
-		}
+			isDead = true;
 	}
 	#endregion
 
 	#region Public
 	public void LeftTapDetected()
 	{
-		if (currentState != State.Dodge) 
-		{
-			if (currentState == State.GetClose) 
-			{
-				agent.velocity = Vector3.zero;
-				agent.Stop ();
-			}
-
-			currentState = State.Dodge;
-			anim.SetTrigger ("Dodge");
-			isAttacked = false;
-		}
+		isDodge = true;
 	}
+
 	public void RightTapDetected()
 	{
 		if (currentState == State.Idle)
@@ -265,10 +341,11 @@ public class PlayerManager : Singleton<PlayerManager>
 
 	public void Hit(int damage)
 	{
-		if (currentState != State.Dodge) 
+		if (currentState != State.Dodge &&
+			(Enemy.ReferenceEquals(target, null) || !target.CanParry())) 
 		{
+			isHit = true;
 			health -= damage;
-			currentState = State.Hit;
 		} 
 		else 
 		{
@@ -276,6 +353,21 @@ public class PlayerManager : Singleton<PlayerManager>
 			comboMeter++;
 			comboResetTimer = Time.time + resetDuration;
 		}
+	}
+
+	public float GetConeAngle()
+	{
+		return coneAngle;
+	}
+
+	public float GetConeLength()
+	{
+		return coneLength;
+	}
+
+	public bool IsDead()
+	{
+		return currentState == State.Dead;
 	}
 	#endregion
 
@@ -303,23 +395,23 @@ public class PlayerManager : Singleton<PlayerManager>
 
 	public void EndAttack()
 	{
-		currentState = State.Idle;
+		isIdle = true;
 		comboResetTimer = Time.time + resetDuration;
 	}
 
 	public void KnockDownStrikePoint()
 	{
 		target.KnockedDown (attackDamages);
+		target = null;
 	}
 
 	public void EndAnim()
 	{
 		// Wrong Dodge
-		if (!isAttacked) 
-		{
+		if (currentState == State.Dodge && !isAttacked) 
 			ResetCombo ();
-		}
-		currentState = State.Idle;
+		
+		isIdle = true;
 	}
 
 	public void LaunchArrow()
