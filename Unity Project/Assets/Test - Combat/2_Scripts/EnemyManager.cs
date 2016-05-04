@@ -18,10 +18,10 @@ public class EnemyManager : Singleton<EnemyManager>
 
 	[SerializeField]
 	private Transform placementPoints;
-	[SerializeField]
-	List<Transform> linkedPlacementPoints = new List<Transform>();
-	[SerializeField]
-	List<Transform> unlinkedPlacementPoints = new List<Transform>();
+
+	private List<Transform> linkedPlacementPoints = new List<Transform>();
+	private List<Transform> unlinkedPlacementPoints = new List<Transform>();
+	private List<Transform> meleeRangePlacementPoints = new List<Transform>();
 	#endregion
 
 	#region Unity
@@ -92,8 +92,10 @@ public class EnemyManager : Singleton<EnemyManager>
 	{
 		if(!isEnemyAttacking && Time.time > attTimer && !PlayerManager.Instance.IsDead())
 		{
-//			List<Enemy> enemiesInCone = GetEnemiesInCone ();
-			List<Enemy> enemiesInCone = enemyList.FindAll (x => x.CanAttack() && x.IsInCameraFOV());
+			List<Enemy> enemiesInCone = enemyList.FindAll (x => 
+				x.CanAttack() && 
+				x.IsInCameraFOV() &&
+				x.GetDistance() < 2.12f);
 
 			if (!List<Enemy>.ReferenceEquals (enemiesInCone, null)) 
 			{
@@ -124,6 +126,14 @@ public class EnemyManager : Singleton<EnemyManager>
 
 			foreach (Transform point in placementPoints) 
 			{
+				if (!List<Transform>.ReferenceEquals (meleeRangePlacementPoints, null)) 
+				{
+					if(meleeRangePlacementPoints.Count < 4)
+						meleeRangePlacementPoints.Add (point);						
+				} 
+				else
+					meleeRangePlacementPoints.Add (point);
+
 				dist = Mathf.Infinity;
 				temp = null;
 
@@ -161,7 +171,7 @@ public class EnemyManager : Singleton<EnemyManager>
 		{
 			temp.Sort (delegate(Enemy a, Enemy b)
 				{
-					int compareThreat = a.GetThreat ().CompareTo (b.GetThreat ());
+					int compareThreat = b.GetThreat ().CompareTo (a.GetThreat ());
 					
 					if (compareThreat == 0)
 						return (a.GetDistance ()).CompareTo (b.GetDistance ());
@@ -223,6 +233,40 @@ public class EnemyManager : Singleton<EnemyManager>
 	{
 		attTimer = Time.time + attWaitTime;
 		isEnemyAttacking = false;
+	}
+
+	public void FreePlacementPoint (Transform placementPoint)
+	{
+		linkedPlacementPoints.Remove (placementPoint);
+		unlinkedPlacementPoints.Add (placementPoint);
+
+		if (meleeRangePlacementPoints.Contains (placementPoint)) 
+		{
+			float dist = Mathf.Infinity;
+			Enemy temp = null;
+
+			foreach (var enemy in enemyList) 
+			{
+				float currentDist = Vector3.Distance (enemy.transform.position, placementPoint.position);
+
+				//					print (currentDist + "   " + dist + "  " + enemy.Linked ());
+				if (currentDist < dist && !meleeRangePlacementPoints.Contains (enemy.GetPlacementPoint())) 
+				{
+					temp = enemy;
+				}
+			}
+
+			if (!Enemy.ReferenceEquals (temp, null)) 
+			{
+				linkedPlacementPoints.Remove (temp.GetPlacementPoint());
+				unlinkedPlacementPoints.Add (temp.GetPlacementPoint());
+
+
+				temp.SetPlacementPoint (placementPoint);
+				linkedPlacementPoints.Add (placementPoint);
+				unlinkedPlacementPoints.Remove (placementPoint);
+			}
+		}
 	}
 	#endregion
 }

@@ -1,10 +1,13 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public class Enemy : MonoBehaviour 
+public abstract class Enemy : MonoBehaviour
 {
+	public Enemy()
+	{
+	}
 	#region Properties
-	private enum State
+	public enum State
 	{
 		None,
 		Idle,
@@ -15,23 +18,22 @@ public class Enemy : MonoBehaviour
 		Dead
 	}
 
-	private enum Type
+	public enum Type
 	{
-		Melee,
-		Ranged
+		Weak,
+		Strong
 	}
 
-	private enum Threat
+	public enum Threat
 	{
 		Vulnerable = 0,
-		High = 1
+		High = 1,
+		Veryhigh = 2
 	}
 
 	[Header("Enemy Parameters")]
-	[SerializeField]
-	private int health = 150;
-	[SerializeField]
-	private int attackDamages = 15;	
+	public int health = 150;
+	public int attackDamages = 15;	
 	[SerializeField]
 	private float meleeRangeMin = 0;
 	[SerializeField]
@@ -41,7 +43,16 @@ public class Enemy : MonoBehaviour
 	[SerializeField]
 	private float knockDownDuration = 5;
 
-	private Type type;
+	[Header("Enemy Color Change")]
+	[SerializeField]
+	private SkinnedMeshRenderer mr;
+	[SerializeField]
+	private Material materialEnemy;
+	[SerializeField]
+	private Material materialAttack;
+
+	[HideInInspector]
+	public Type type;
 	private Threat threat;
 	private State currentState;
 	private Animator anim;
@@ -63,8 +74,8 @@ public class Enemy : MonoBehaviour
 	private bool waitForEndoFNextHit = false;
 	private bool isEndAttack = false;
 
-	[SerializeField]
 	private Transform placementPoint;
+	private Transform setNewPlacement;
 	#endregion
 
 	#region Unity
@@ -81,16 +92,24 @@ public class Enemy : MonoBehaviour
 
 		SwitchState(State.Moving);
 		threat = Threat.Vulnerable;
+
+		Init ();
 	}
 
-	void Update () 
+	void UpdateEnemy () 
 	{
+		if (placementPoint != setNewPlacement)
+			placementPoint = setNewPlacement;
 		if (currentState != State.Dead) 
 		{
 			CheckState ();
 			UpdateState ();
 		}
 	}
+	#endregion
+
+	#region Abstract
+	public abstract void Init ();
 	#endregion
 
 	#region StateMachine
@@ -198,6 +217,10 @@ public class Enemy : MonoBehaviour
 				break;
 
 			case State.Attack:
+//				print(gameObject + "  " + newState);
+				threat = Threat.Vulnerable;
+				mr.material = materialEnemy;
+
 				if (!isEndAttack)
 					EnemyManager.Instance.EnemyFinishedAttack ();
 				else
@@ -214,7 +237,9 @@ public class Enemy : MonoBehaviour
 				anim.SetTrigger ("Idle");
 				break;
 			case State.Attack:
-				BasicAttack ();
+				mr.material = materialAttack;
+				anim.SetTrigger ("Attack");
+				threat = Threat.High;
 				break;
 			case State.Moving:
 				anim.SetTrigger ("Walk");
@@ -235,6 +260,8 @@ public class Enemy : MonoBehaviour
 			case State.Dead:
 				anim.SetTrigger ("Dead");
 				EnemyManager.Instance.CheckAnyEnemyLeft ();
+				EnemyManager.Instance.FreePlacementPoint (placementPoint);
+				placementPoint = null;
 				break;
 			}
 		}
@@ -282,11 +309,6 @@ public class Enemy : MonoBehaviour
 			} else
 				SwitchState (State.Idle);
 		}
-	}
-
-	private void BasicAttack()
-	{
-		anim.SetTrigger ("Attack");		
 	}
 
 	private void CheckHealth()
@@ -361,12 +383,19 @@ public class Enemy : MonoBehaviour
 
 	public void SetPlacementPoint(Transform point)
 	{
+		setNewPlacement = point;
+		placementPoint = null;
 		placementPoint = point;
 	}
 
 	public bool Linked()
 	{
 		return placementPoint != null;
+	}
+
+	public Transform GetPlacementPoint()
+	{
+		return placementPoint;
 	}
 	#endregion
 
@@ -389,7 +418,9 @@ public class Enemy : MonoBehaviour
 	public void KnockDownOver()
 	{
 		isKnockDownOver = true;
+
 		isMove = true;
+//		print(gameObject + " A");
 	}
 
 	public void EndAttack()
@@ -398,12 +429,16 @@ public class Enemy : MonoBehaviour
 		EnemyManager.Instance.EnemyFinishedAttack ();
 
 		isMove = true;
+//		print(gameObject + " B");
 	}
 
 	public void EndAnim()
 	{
-		if (!waitForEndoFNextHit)
+		if (!waitForEndoFNextHit) 
+		{
 			isMove = true;
+//			print (gameObject + " C");
+		}
 		else
 			waitForEndoFNextHit = false;
 	}
