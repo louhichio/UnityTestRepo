@@ -6,7 +6,7 @@ public class EnemyManager : Singleton<EnemyManager>
 {
 	#region Properties
 	private Transform marker;
-
+	[SerializeField]
 	private List<Enemy> enemyList = new List<Enemy>();
 	private Enemy currentTargetedEnemy;
 
@@ -197,7 +197,6 @@ public class EnemyManager : Singleton<EnemyManager>
 			currentTargetedEnemy = temp.Find (x => x != currentTarget);
 			return currentTargetedEnemy;
 		}
-//		return null;
 	}
 
 	public Enemy GetClosestEnemy()
@@ -225,7 +224,7 @@ public class EnemyManager : Singleton<EnemyManager>
 	{
 		if (Enemy.ReferenceEquals (enemyList.Find (x => x.isAlive()), null)) 
 		{
-//			GameOver
+			UIManager.Instance.GameOver ();
 		}
 	}
 
@@ -235,8 +234,10 @@ public class EnemyManager : Singleton<EnemyManager>
 		isEnemyAttacking = false;
 	}
 
-	public void FreePlacementPoint (Transform placementPoint)
+	public void FreePlacementPoint (Transform placementPoint, Enemy enemyToRemove)
 	{
+		enemyList.Remove (enemyToRemove);
+
 		linkedPlacementPoints.Remove (placementPoint);
 		unlinkedPlacementPoints.Add (placementPoint);
 

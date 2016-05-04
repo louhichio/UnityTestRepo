@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public class WeakEnemy : Enemy 
+public class StrongEnemy : Enemy 
 {
 	#region Unity
 	void Awake()
@@ -23,9 +23,9 @@ public class WeakEnemy : Enemy
 	#region Override
 	public override void Init ()
 	{
-		type = Type.Weak;
-		health = 60;
-		attackDamages = 10;
+		type = Type.Strong;
+		health = 90;
+		attackDamages = 30;
 	}
 	#endregion
 }

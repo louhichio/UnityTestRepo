@@ -19,6 +19,7 @@ public class PlayerManager : Singleton<PlayerManager>
 	[Header("Playable character Movements")]
 	[SerializeField]
 	private int health = 150;
+	private float healthMax;
 	[SerializeField]
 	private int attackDamages = 15;
 
@@ -27,6 +28,7 @@ public class PlayerManager : Singleton<PlayerManager>
 	private float resetDuration = 1.0f;
 	[SerializeField]
 	private int comboMeterBonus = 1;
+	private float comboMeterMax = 20;
 
 	[Header("Swipe Targeting")]
 	[SerializeField]
@@ -92,6 +94,7 @@ public class PlayerManager : Singleton<PlayerManager>
 	void Start()
 	{
 		SwitchState (State.Idle);
+		healthMax = health;
 	}
 
 	void Update()
@@ -103,6 +106,9 @@ public class PlayerManager : Singleton<PlayerManager>
 		{
 			ResetCombo ();
 		}
+
+		UIManager.Instance.UpdateHealth ((float)health / healthMax);
+		UIManager.Instance.UpdateCombo ((float)comboMeter / comboMeterMax, (int)(comboResetTimer - Time.time));
 	}
 	#endregion
 
@@ -160,7 +166,7 @@ public class PlayerManager : Singleton<PlayerManager>
 		case State.Hit:
 			ResetCombo ();
 			break;
-		case State.Dodge:
+		case State.Dead:
 			break;
 		}
 	}
@@ -213,6 +219,8 @@ public class PlayerManager : Singleton<PlayerManager>
 				break;
 			case State.Dead:
 				anim.SetTrigger ("Dead");
+				agent.enabled = false;
+				UIManager.Instance.GameOver ();
 				break;
 			}
 		}

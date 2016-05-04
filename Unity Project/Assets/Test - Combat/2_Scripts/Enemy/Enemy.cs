@@ -34,10 +34,10 @@ public abstract class Enemy : MonoBehaviour
 	[Header("Enemy Parameters")]
 	public int health = 150;
 	public int attackDamages = 15;	
-	[SerializeField]
-	private float meleeRangeMin = 0;
-	[SerializeField]
-	private float meleeRangeMax = 2.12f;
+//	[SerializeField]
+//	private float meleeRangeMin = 0;
+//	[SerializeField]
+//	private float meleeRangeMax = 2.12f;
 	[SerializeField]
 	private float meleeAttackDistanceMax = 2.12f;
 	[SerializeField]
@@ -79,13 +79,13 @@ public abstract class Enemy : MonoBehaviour
 	#endregion
 
 	#region Unity
-	void Awake()
+	public void AwakeEnemy()
 	{
 		anim = GetComponent<Animator> ();
 		agent = GetComponent<NavMeshAgent> ();
 	}
 
-	void Start () 
+	public void StartEnemy () 
 	{
 		plTransform = PlayerManager.Instance.transform;
 		plManager = PlayerManager.Instance;
@@ -96,7 +96,7 @@ public abstract class Enemy : MonoBehaviour
 		Init ();
 	}
 
-	void UpdateEnemy () 
+	public void UpdateEnemy () 
 	{
 		if (placementPoint != setNewPlacement)
 			placementPoint = setNewPlacement;
@@ -130,19 +130,23 @@ public abstract class Enemy : MonoBehaviour
 			isKnockedDown = false;
 			SwitchState(State.KnockedDown);
 		}
+		else if(isAttacking)
+		{
+			if (currentState == State.KnockedDown && !isKnockDownOver) {} 
+			else 
+			{
+				isAttacking = false;
+				SwitchState (State.Attack);
+			}
+		}
 		else if (isMove) 
 		{
-			if (currentState == State.KnockedDown && !isKnockDownOver) {
-			} 
-			else {
+			if (currentState == State.KnockedDown && !isKnockDownOver) {} 
+			else 
+			{
 				isMove = false;
 				SwitchState (State.Moving);
 			}
-		}
-		else if(isAttacking)
-		{
-			isAttacking = false;
-			SwitchState (State.Attack);
 		}
 	}
 
@@ -169,6 +173,8 @@ public abstract class Enemy : MonoBehaviour
 			break;
 
 		case State.Attack:
+			if (!anim.GetCurrentAnimatorStateInfo (0).IsName("ATK_Melee_01a"))
+				anim.SetTrigger ("Attack");
 			LookAtPlayer ();
 			break;
 
@@ -217,7 +223,6 @@ public abstract class Enemy : MonoBehaviour
 				break;
 
 			case State.Attack:
-//				print(gameObject + "  " + newState);
 				threat = Threat.Vulnerable;
 				mr.material = materialEnemy;
 
@@ -225,6 +230,10 @@ public abstract class Enemy : MonoBehaviour
 					EnemyManager.Instance.EnemyFinishedAttack ();
 				else
 					isEndAttack = false;
+				break;
+
+			case State.KnockedDown:
+				isKnockDownOver = true;
 				break;
 			}
 
@@ -239,7 +248,7 @@ public abstract class Enemy : MonoBehaviour
 			case State.Attack:
 				mr.material = materialAttack;
 				anim.SetTrigger ("Attack");
-				threat = Threat.High;
+				threat = type == Type.Weak ? Threat.High: Threat.Veryhigh;
 				break;
 			case State.Moving:
 				anim.SetTrigger ("Walk");
@@ -260,7 +269,7 @@ public abstract class Enemy : MonoBehaviour
 			case State.Dead:
 				anim.SetTrigger ("Dead");
 				EnemyManager.Instance.CheckAnyEnemyLeft ();
-				EnemyManager.Instance.FreePlacementPoint (placementPoint);
+				EnemyManager.Instance.FreePlacementPoint (placementPoint, this);
 				placementPoint = null;
 				break;
 			}
@@ -316,6 +325,12 @@ public abstract class Enemy : MonoBehaviour
 		if (health <= 0)
 			isDead = true;
 	}
+
+	private IEnumerator Death()
+	{
+		yield return new WaitForSeconds (5);
+		gameObject.SetActive (false);
+	}
 	#endregion
 
 	#region Public
@@ -353,7 +368,7 @@ public abstract class Enemy : MonoBehaviour
 
 	public bool isAlive()
 	{
-		return currentState != State.Dead;
+		return currentState != State.Dead && health > 0;
 	}
 
 	public bool CanBeAttacked()
@@ -363,7 +378,20 @@ public abstract class Enemy : MonoBehaviour
 
 	public bool CanAttack()
 	{
-		return currentState == State.Idle;
+		float dist;
+		if (placementPoint) 
+		{
+			dist = Vector3.Distance (transform.position, placementPoint.position);
+			if (dist > 0.2f)
+				return false;	
+		}
+		else 
+		{
+			dist = Vector3.Distance (transform.position, plTransform.position);
+			if (dist > meleeAttackDistanceMax)
+				return false;	
+		}
+		return currentState == State.Idle && !isKnockedDown;
 	}
 
 	public void AllowedToAttack()
@@ -420,7 +448,6 @@ public abstract class Enemy : MonoBehaviour
 		isKnockDownOver = true;
 
 		isMove = true;
-//		print(gameObject + " A");
 	}
 
 	public void EndAttack()
@@ -429,18 +456,21 @@ public abstract class Enemy : MonoBehaviour
 		EnemyManager.Instance.EnemyFinishedAttack ();
 
 		isMove = true;
-//		print(gameObject + " B");
 	}
 
 	public void EndAnim()
 	{
 		if (!waitForEndoFNextHit) 
-		{
 			isMove = true;
-//			print (gameObject + " C");
-		}
 		else
 			waitForEndoFNextHit = false;
 	}
+
+	public void EndDeadAnim()
+	{
+		StartCoroutine ("Death");
+	}
+
+
 	#endregion
 }
